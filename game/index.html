@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>SOLMARA — Open-World Crime Story</title>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #0b1020;
+    font-family: "Trebuchet MS", Verdana, sans-serif; color: #fff; }
+  #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+  .panel { background: rgba(8, 12, 26, 0.62); border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 10px; padding: 8px 12px; backdrop-filter: blur(2px); }
+  #topbar { position: absolute; top: 12px; left: 12px; right: 12px; display: flex;
+    justify-content: space-between; align-items: flex-start; gap: 12px; }
+  #wanted { font-size: 26px; letter-spacing: 4px; color: #ffd23f; text-shadow: 0 0 8px #000; }
+  #wanted .off { color: rgba(255, 255, 255, 0.22); }
+  #cash { font-size: 24px; font-weight: bold; color: #7dff9a; text-shadow: 0 0 8px #000; }
+  #cash small { display: block; font-size: 11px; color: #cfe8ff; font-weight: normal; letter-spacing: 2px; }
+  #healthbar { width: 180px; height: 12px; background: rgba(0,0,0,0.55); border: 1px solid #fff3;
+    border-radius: 6px; overflow: hidden; margin-top: 6px; }
+  #healthfill { height: 100%; width: 100%; background: linear-gradient(90deg, #ff5a5a, #ff9a3d); }
+  #objective { position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    max-width: 520px; text-align: center; font-size: 15px; line-height: 1.35; }
+  #objective b { color: #ffd23f; }
+  #objective .sub { display: block; font-size: 12px; color: #cfe8ff; }
+  #minimapWrap { position: absolute; right: 12px; top: 84px; text-align: center; }
+  #minimap { width: 190px; height: 190px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.35);
+    background: #10182e; box-shadow: 0 0 18px rgba(0,0,0,0.6); }
+  #minimapWrap .cap { font-size: 11px; letter-spacing: 3px; color: #cfe8ff; margin-top: 4px; }
+  #speedo { position: absolute; right: 16px; bottom: 16px; text-align: right; font-size: 34px;
+    font-weight: bold; text-shadow: 0 0 10px #000; }
+  #speedo small { display: block; font-size: 12px; letter-spacing: 3px; color: #ffd23f; }
+  #hint { position: absolute; left: 12px; bottom: 16px; font-size: 13px; line-height: 1.6;
+    color: #eaf2ff; text-shadow: 0 1px 3px #000; }
+  #hint b { color: #ffd23f; }
+  #toast { position: absolute; left: 50%; bottom: 110px; transform: translateX(-50%);
+    font-size: 20px; font-weight: bold; color: #ffd23f; text-shadow: 0 0 10px #000;
+    opacity: 0; transition: opacity 0.3s; text-align: center; }
+  #crosshair { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px;
+    margin: -11px 0 0 -11px; display: none; }
+  #crosshair:before, #crosshair:after { content: ""; position: absolute; background: #fff;
+    box-shadow: 0 0 4px #000; }
+  #crosshair:before { left: 10px; top: 0; width: 2px; height: 22px; }
+  #crosshair:after { left: 0; top: 10px; width: 22px; height: 2px; }
+  .screen { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center; pointer-events: auto;
+    background: radial-gradient(ellipse at 50% 30%, rgba(255, 150, 60, 0.25), rgba(5, 8, 20, 0.88) 70%); }
+  .screen h1 { font-size: 72px; margin: 0; letter-spacing: 10px; color: #ffd23f;
+    text-shadow: 0 4px 0 #b3541e, 0 8px 24px #000; font-style: italic; }
+  .screen h2 { font-size: 20px; margin: 6px 0 18px; letter-spacing: 6px; color: #7dd8ff; font-weight: normal; }
+  .screen p { max-width: 620px; font-size: 15px; line-height: 1.6; color: #eaf2ff; margin: 6px 18px; }
+  .screen .keys { font-size: 13px; color: #cfe8ff; }
+  .screen .keys b { color: #ffd23f; }
+  .bigbtn { margin-top: 22px; font-size: 20px; font-weight: bold; letter-spacing: 3px;
+    color: #1a1206; background: linear-gradient(180deg, #ffe066, #ffb52e); border: none;
+    border-radius: 10px; padding: 14px 42px; cursor: pointer; box-shadow: 0 6px 0 #a86a00, 0 10px 24px #000; }
+  .bigbtn:active { transform: translateY(4px); box-shadow: 0 2px 0 #a86a00; }
+  .hidden { display: none !important; }
+  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js" } }
+</script>
+</head>
+<body>
+<canvas id="scene" aria-label="SOLMARA: an open-world crime game. Walk and drive around the city, steal cars, dodge the police and finish Lena's three jobs."></canvas>
+<div id="hud">
+  <div id="topbar">
+    <div class="panel">
+      <div id="wanted" aria-label="wanted level"></div>
+      <div id="healthbar"><div id="healthfill"></div></div>
+    </div>
+    <div id="objective" class="panel"><b id="objTitle">SOLMARA</b><span class="sub" id="objText"></span></div>
+    <div class="panel"><div id="cash">$0</div></div>
+  </div>
+  <div id="minimapWrap"><canvas id="minimap" width="190" height="190"></canvas><div class="cap">SOLMARA</div></div>
+  <div id="speedo" class="hidden"><span id="speedVal">0</span><small id="speedUnit">KM/H &middot; <span id="carName"></span></small></div>
+  <div id="hint"></div>
+  <div id="toast"></div>
+  <div id="crosshair"></div>
+</div>
+
+<div id="titleScreen" class="screen">
+  <h1>SOLMARA</h1>
+  <h2>AN OPEN-WORLD CRIME STORY</h2>
+  <p>You are <b>Dario Reyes</b>, a getaway driver fresh out of the Solmara docks with empty
+  pockets and a fast reputation. Fixer <b>Lena Cruz</b> has three jobs for you — and the
+  Solmara Police Department has a very short memory for manners.</p>
+  <p>Steal a car, lose the cops, run the jobs. The whole city is yours: six by six blocks of
+  traffic, pedestrians, rooftops and trouble.</p>
+  <p class="keys"><b>WASD</b> move / drive &nbsp; <b>SHIFT</b> run &nbsp; <b>E</b> steal car / grab / talk &nbsp;
+  <b>F</b> leave car &nbsp; <b>CLICK</b> shoot &nbsp; <b>MOUSE DRAG</b> look &nbsp; <b>P</b> pause &nbsp; <b>M</b> mute</p>
+  <button class="bigbtn" id="playBtn">START ENGINE</button>
+  <p class="keys" id="saveNote"></p>
+</div>
+
+<div id="pauseScreen" class="screen hidden">
+  <h1 style="font-size:44px">PAUSED</h1>
+  <p>Solmara waits for no one — except right now. Your progress is saved automatically.</p>
+  <button class="bigbtn" id="resumeBtn">RESUME</button>
+  <p class="keys"><b>R</b> restart from save &nbsp; <b>N</b> new game</p>
+</div>
+
+<div id="endScreen" class="screen hidden">
+  <h1 id="endTitle" style="font-size:44px">WASTED</h1>
+  <p id="endText"></p>
+  <button class="bigbtn" id="retryBtn">BACK ON THE STREET</button>
+</div>
+
+<p id="status" role="status" aria-live="polite"></p>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
